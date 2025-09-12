@@ -7,12 +7,6 @@ from django.contrib.auth.models import AbstractUser
 # and allows you to add new ones.
 class User(AbstractUser):
     photo = models.ImageField(upload_to="photo/", null=True, blank=True)
-    # The ManyToManyField is the key here. It creates a relationship
-    # that allows a user to have many friends, and a friend to have many users.
-    #
-    # 'self' means the relationship is with the User model itself.
-    # 'symmetrical=True' means if A is friends with B, B is automatically
-    # friends with A. We will use this field to store accepted friendships.
     friends = models.ManyToManyField(
         'self',
         symmetrical=True,
@@ -42,14 +36,22 @@ class FriendRequest(models.Model):
         unique_together = ('from_user', 'to_user')
 
 
+class ChatRoom(models.Model):
+    participants = models.ManyToManyField(User, related_name="chatrooms")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Room {self.id} ({', '.join([u.username for u in self.participants.all()])})"
+
+
 class ChatMessage(models.Model):
-    sender = models.ForeignKey(User, related_name='sent_messages', on_delete=models.CASCADE)
-    receiver = models.ForeignKey(User, related_name='received_messages', on_delete=models.CASCADE)
+    room = models.ForeignKey(ChatRoom, related_name="messages", on_delete=models.CASCADE)
+    sender = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"From {self.sender.username} to {self.receiver.username}: {self.message[:20]}"
-
     class Meta:
-        ordering = ['timestamp']
+        ordering = ["timestamp"]
+
+    def __str__(self):
+        return f"[{self.room.id}] {self.sender.username}: {self.message[:20]}"

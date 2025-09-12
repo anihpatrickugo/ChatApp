@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import User, FriendRequest, ChatMessage
+from .models import User, FriendRequest, ChatMessage, ChatRoom
 
 # Register your custom User model with the admin site.
 # This allows you to manage users and their friends directly from the
@@ -12,3 +12,6 @@ admin.site.register(User)
 
 # Register the new ChatMessage model.
 admin.site.register(ChatMessage)
+
+# Register the new ChatRoom model.
+admin.site.register(ChatRoom)

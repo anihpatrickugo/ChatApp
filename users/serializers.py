@@ -2,7 +2,7 @@
 
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from rest_framework import serializers
-from .models import User, ChatMessage
+from .models import User, ChatMessage, ChatRoom
 
 class CustomRegisterSerializer(RegisterSerializer):
     _has_phone_field = False  # Add this line
@@ -23,10 +23,26 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username']
 
+
 class ChatMessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
-    receiver = UserSerializer(read_only=True)
 
     class Meta:
         model = ChatMessage
-        fields = ['id', 'sender', 'receiver', 'message', 'timestamp']
+        fields = ["id", "room", "sender", "message", "timestamp"]
+        read_only_fields = ["room", "sender", "timestamp"]
+
+
+class ChatRoomSerializer(serializers.ModelSerializer):
+    participants = UserSerializer(many=True, read_only=True)
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatRoom
+        fields = ["id", "participants", "created_at", "last_message"]
+
+    def get_last_message(self, obj):
+        last = obj.messages.order_by("-timestamp").first()
+        if last:
+            return ChatMessageSerializer(last).data
+        return None

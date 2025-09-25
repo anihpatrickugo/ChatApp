@@ -115,15 +115,30 @@ CSRF_TRUSTED_ORIGINS = [
 WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 
+#
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [env("REDIS_URL")]
+#         },
+#     },
+# }
 
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [env("REDIS_URL")]
+            "hosts": [{
+                "address": ("engaging-anteater-11400.upstash.io", 6379),
+                "password": "ASyIAAIncDI2YjMyYTY2YzEzMmQ0N2VjOTdkMzVmZDRkZGJlMGIwZHAyMTE0MDA",
+                "ssl": True,
+                "ssl_cert_reqs": None,  # set to None if you don't have certificates
+            }],
         },
     },
 }
+
 
 
 # Database

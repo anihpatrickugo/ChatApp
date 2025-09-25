@@ -1,16 +1,35 @@
+
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.db.models import Q
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
-from django.shortcuts import get_object_or_404
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from django.db.models import Q
+from rest_framework.exceptions import PermissionDenied
+
 from .models import User, FriendRequest, ChatRoom, ChatMessage
-from .serializers import ChatMessageSerializer
-
-
+from .serializers import (
+    PrivateChatRoomSerializer,
+    GroupChatRoomSerializer,
+    FriendRequestSerializer,
+    ChatMessageSerializer,
+    UserSerializer,
+)
 
 # ------------------ FRIEND REQUEST VIEWS ------------------
+
+class FriendRequestListView(generics.ListAPIView):
+    """
+    Lists all friend requests received by the logged-in user,
+    including sender details.
+    """
+    serializer_class = FriendRequestSerializer
+
+
+    def get_queryset(self):
+        return FriendRequest.objects.filter(to_user=self.request.user)
+
 
 class FriendRequestSendView(APIView):
     def post(self, request, user_id):
@@ -71,62 +90,76 @@ class FriendRequestDeclineView(APIView):
 
 # ------------------ CHAT VIEWS ------------------
 
-# Fetch all messages in a specific chat room
-class ChatRoomMessagesListView(generics.ListAPIView):
+class PrivateChatRoomListView(generics.ListAPIView):
+    """List all rooms where the authenticated user is a participant"""
+    serializer_class = PrivateChatRoomSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        return ChatRoom.objects.filter(participants=user).order_by("-created_at")
+
+
+class GroupRoomListView(generics.ListAPIView):
+    """List all rooms where the authenticated user is a participant"""
+    serializer_class = GroupChatRoomSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        return ChatRoom.objects.filter(participants=user).order_by("-created_at")
+
+
+class ChatRoomFriendView(APIView):
+
+
+    def get(self, request, room_id):
+
+        room = get_object_or_404(ChatRoom, pk=room_id)
+
+        # Ensure the current user is a participant
+        if request.user not in room.participants.all():
+            return JsonResponse({"error": "You are not part of this room"}, status=403)
+
+        # Find the other participant
+        friend = room.participants.exclude(id=request.user.id).first()
+
+        if not friend:
+            return JsonResponse({"error": "No friend found"}, status=404)
+
+        # Return friend details (with photo)
+        return JsonResponse({
+            "id": friend.id,
+            "username": friend.username,
+            "first_name": friend.first_name,
+            "last_name": friend.last_name,
+            "email": friend.email,
+            "photo_url": request.build_absolute_uri(friend.photo.url) if friend.photo else None,
+        })
+
+
+class ChatMessageListView(generics.ListAPIView):
     serializer_class = ChatMessageSerializer
 
     def get_queryset(self):
         room_id = self.kwargs["room_id"]
-        current_user = self.request.user
 
-        room = get_object_or_404(ChatRoom, id=room_id)
+        # ✅ Check if user is participant in the room
+        try:
+            room = ChatRoom.objects.get(id=room_id)
+        except ChatRoom.DoesNotExist:
+            raise PermissionDenied("This room does not exist.")
 
-        # Ensure the current user is a participant
-        if not room.participants.filter(id=current_user.id).exists():
-            return ChatMessage.objects.none()
+        if not room.participants.filter(id=self.request.user.id).exists():
+            raise PermissionDenied("You are not a participant in this room.")
 
-        return room.messages.all().order_by("timestamp")
+        # ✅ Return only this room's messages
+        return ChatMessage.objects.filter(room=room).order_by("timestamp")
 
 
-# Optional: send a new message into a room
-class ChatRoomSendMessageView(APIView):
-    def post(self, request, room_id):
-        room = get_object_or_404(ChatRoom, id=room_id)
-        current_user = request.user
 
-        if not room.participants.filter(id=current_user.id).exists():
-            return Response(
-                {"error": "You are not part of this chat room."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+class EditProfileView(generics.RetrieveUpdateAPIView):
+    serializer_class = UserSerializer
 
-        message_text = request.data.get("message")
-        if not message_text:
-            return Response(
-                {"error": "Message cannot be empty."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+    def get_object(self):
+        return self.request.user
 
-        # Save to DB
-        msg = ChatMessage.objects.create(
-            room=room,
-            sender=current_user,
-            message=message_text
-        )
 
-        serializer = ChatMessageSerializer(msg)
-
-        # Broadcast to WebSocket group
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"chat_{room.id}",
-            {
-                "type": "chat.message",
-                "room_id": room.id,
-                "user": current_user.username,
-                "message": serializer.data["message"],
-                "timestamp": serializer.data["timestamp"],
-            }
-        )
-
-        return Response(serializer.data, status=status.HTTP_201_CREATED)

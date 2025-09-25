@@ -2,7 +2,7 @@
 
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from rest_framework import serializers
-from .models import User, ChatMessage, ChatRoom
+from .models import User, ChatMessage, ChatRoom, FriendRequest
 
 class CustomRegisterSerializer(RegisterSerializer):
     _has_phone_field = False  # Add this line
@@ -19,22 +19,26 @@ class CustomRegisterSerializer(RegisterSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = User
-        fields = ['id', 'username']
+        fields = ["id", "username", "email", "first_name", "last_name", "photo"]
+
+
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
-    sender = UserSerializer(read_only=True)
+    sender = serializers.CharField(source="sender.username")  # show username instead of ID
+    room = serializers.IntegerField(source="room.id")
 
     class Meta:
         model = ChatMessage
         fields = ["id", "room", "sender", "message", "timestamp"]
-        read_only_fields = ["room", "sender", "timestamp"]
 
 
-class ChatRoomSerializer(serializers.ModelSerializer):
-    participants = UserSerializer(many=True, read_only=True)
+class PrivateChatRoomSerializer(serializers.ModelSerializer):
+    # Show only the other participant(s), excluding current user
+    participants = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
 
     class Meta:
@@ -46,3 +50,26 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         if last:
             return ChatMessageSerializer(last).data
         return None
+
+    def get_participants(self, obj):
+        request = self.context.get("request")
+        user = request.user if request else None
+        others = obj.participants.exclude(id=user.id) if user else obj.participants.all()
+        return UserSerializer(others, many=True, context={"request": request}).data
+
+
+
+class GroupChatRoomSerializer(serializers.ModelSerializer):
+    participants = UserSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ChatRoom
+        fields = ["id", "participants", "created_at"]
+
+
+class FriendRequestSerializer(serializers.ModelSerializer):
+    from_user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = FriendRequest
+        fields = ["id", "from_user", "timestamp"]

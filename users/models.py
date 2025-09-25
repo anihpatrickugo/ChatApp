@@ -6,7 +6,7 @@ from django.contrib.auth.models import AbstractUser
 # This gives you all the standard user fields (username, password, email, etc.)
 # and allows you to add new ones.
 class User(AbstractUser):
-    photo = models.ImageField(upload_to="photo/", null=True, blank=True)
+    photo = models.ImageField(upload_to="chatapp/photo/", null=True, blank=True)
     friends = models.ManyToManyField(
         'self',
         symmetrical=True,

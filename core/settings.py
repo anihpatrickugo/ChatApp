@@ -108,6 +108,10 @@ TEMPLATES = [
     },
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://chatapp-p6tu.onrender.com",
+]
+
 WSGI_APPLICATION = 'core.wsgi.application'
 ASGI_APPLICATION = 'core.asgi.application'
 

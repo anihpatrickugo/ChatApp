@@ -72,6 +72,7 @@ INSTALLED_APPS = [
 
     'cloudinary_storage',
     'cloudinary',
+    'algoliasearch_django',
 
     # custom apps
     'users',
@@ -124,6 +125,9 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+
+
 
 
 
@@ -228,6 +232,7 @@ REST_FRAMEWORK = {
     )
 }
 
+
 # Authetication Backennds
 AUTHENTICATION_BACKENDS = [
     # Needed to login by username in Django admin, regardless of `allauth`
@@ -272,4 +277,11 @@ STORAGES = {
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     },
+}
+
+
+ALGOLIA = {
+    "APPLICATION_ID": env('ALGOLIA_APPLICATION_ID'),
+    "API_KEY": env('ALGOLIA_WRITE_API_KEY'),
+
 }

@@ -16,6 +16,12 @@ class User(AbstractUser):
     def __str__(self):
         return self.username
 
+    # Custom serializer for image
+    def get_photo(self):
+            if self.photo:  # assuming you have an ImageField
+                return self.photo.url
+            return None
+
 
 # This is the new model for tracking friend requests.
 class FriendRequest(models.Model):
